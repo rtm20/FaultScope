@@ -1,0 +1,1107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171b1b">
+  <title>FaultScope / Live Investigation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="assets/lucide.min.js"></script>
+  <script src="assets/three.min.js"></script>
+  <style>
+    :root {
+      --ink: #202726;
+      --muted: #6a7771;
+      --paper: #f5f7f5;
+      --line: #dce3de;
+      --night: #171b1b;
+      --night-line: #35413e;
+      --lime: #d3f891;
+      --teal: #007a68;
+      --coral: #f09478;
+      --blue: #93cbdc;
+      --display: 'Space Grotesk', sans-serif;
+      --body: 'Manrope', sans-serif;
+      --mono: 'IBM Plex Mono', monospace;
+    }
+    * { box-sizing: border-box; letter-spacing: 0; }
+    body { margin: 0; background: var(--night); color: var(--ink); font: 13px var(--body); }
+    button, input, select, textarea { font: inherit; }
+    fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+    button { cursor: pointer; color: inherit; }
+    button:disabled { opacity: .42; cursor: not-allowed; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible, a:focus-visible {
+      outline: 3px solid #62bda9; outline-offset: 4px;
+    }
+    button, a, input { -webkit-tap-highlight-color: transparent; }
+    button svg { width: 16px; height: 16px; flex-shrink: 0; }
+    h1, h2, h3, p { margin: 0; }
+    h1, h2, h3 { font-family: var(--display); font-weight: 500; }
+    [hidden] { display: none !important; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    .mono { font-family: var(--mono); }
+    .eyebrow { font: 10px var(--mono); text-transform: uppercase; }
+    .muted { color: var(--muted); }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; flex-shrink: 0; }
+    .icon-button { width: 36px; height: 36px; display: inline-grid; place-items: center; border: 1px solid var(--line); background: transparent; border-radius: 5px; flex-shrink: 0; }
+    .icon-button:hover { background: #e9eeea; }
+    .button { display: inline-flex; justify-content: center; align-items: center; gap: 9px; min-height: 40px; padding: 10px 15px; border: 1px solid var(--line); border-radius: 5px; background: transparent; font-size: 12px; font-weight: 600; }
+    .button:hover { background: #e9eeea; }
+    .button.primary { background: var(--ink); color: white; border-color: var(--ink); }
+    .button.primary:hover { background: #34453d; }
+    .text-button { border: 0; padding: 5px 0; background: transparent; color: var(--teal); font-size: 11px; display: inline-flex; align-items: center; gap: 6px; }
+    .text-button:hover { text-decoration: underline; }
+    .topbar { background: var(--paper); height: 66px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 26px; }
+    .identity { display: flex; align-items: center; gap: 11px; }
+    .brand-icon { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 6px; background: var(--ink); color: var(--lime); }
+    .brand-icon svg { width: 20px; height: 20px; }
+    .wordmark { font: 600 22px var(--display); }
+    .brand-divider { height: 18px; width: 1px; background: #cdd6cf; margin: 0 7px; }
+    .workspace-name { font-size: 11px; color: var(--muted); }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
+    .demo-badge { border: 1px solid #ccd5cd; background: transparent; border-radius: 4px; padding: 6px 8px; font: 9px var(--mono); display: flex; align-items: center; gap: 6px; color: #617461; }
+    .top-actions .button { min-height: 34px; padding: 7px 11px; font-size: 11px; }
+    .app { max-width: 2100px; margin: auto; }
+    .sourcebar { min-height: 58px; display: flex; align-items: center; justify-content: space-between; padding: 10px 26px; gap: 16px; background: #202625; color: #dfe6e0; border-bottom: 1px solid #36403c; }
+    .source { display: flex; align-items: center; gap: 11px; min-width: 0; }
+    .source > svg { width: 17px; height: 17px; color: var(--lime); flex-shrink: 0; }
+    .source-name { font: 11px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 310px; }
+    .source-meta { font-size: 10px; color: #90a298; margin-top: 4px; }
+    .sourcebar button { color: #c4d6c9; }
+    .source-separator { height: 25px; width: 1px; background: #3d4942; margin: 0 8px; }
+    .source-link { display: flex; align-items: center; gap: 8px; color: #9aac9e; font: 9px var(--mono); }
+    .source-link svg { width: 12px; height: 12px; color: #627569; }
+    .run-status { color: var(--lime); font: 10px var(--mono); display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+    .workbench { display: grid; grid-template-columns: minmax(0, 1fr) 404px; min-height: 700px; }
+    .machine-space { min-width: 0; display: grid; grid-template-rows: minmax(420px, 1fr) 190px; background: var(--night); color: #eaf0eb; }
+    .stage { min-height: 420px; position: relative; overflow: hidden; background-image: linear-gradient(#b1c8bb06 1px, transparent 1px), linear-gradient(90deg, #b1c8bb06 1px, transparent 1px); background-size: 38px 38px; }
+    .stage-heading { position: absolute; top: 24px; left: 26px; z-index: 2; pointer-events: none; }
+    .stage-heading .eyebrow { color: #8b9b90; display: flex; align-items: center; gap: 8px; }
+    .stage-heading h1 { font-size: 23px; color: #f3f7f1; margin-top: 7px; }
+    .stage-heading p { margin-top: 6px; font-size: 10px; color: #91a297; }
+    .stage-tools { position: absolute; right: 20px; top: 24px; z-index: 3; display: flex; gap: 7px; }
+    .stage-tools .icon-button { width: 33px; height: 33px; color: #c2d3c7; border-color: #435147; background: #202925db; }
+    .stage-tools .icon-button:hover, .stage-tools .icon-button[aria-pressed="true"] { background: var(--lime); color: #273621; border-color: var(--lime); }
+    #machine-canvas { position: absolute; inset: 0; touch-action: pan-y; cursor: grab; }
+    #machine-canvas:active { cursor: grabbing; }
+    #machine-canvas canvas { display: block; width: 100%; height: 100%; }
+    .render-fallback { position: absolute; top: 32%; left: 12%; right: 12%; color: #c8d8ce; font-size: 13px; text-align: center; line-height: 1.8; padding: 20px; border: 1px solid #516356; }
+    .components { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+    .component-marker { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; display: flex; align-items: center; gap: 7px; border: 1px solid #536057; padding: 7px 9px; background: #1a231fe8; color: #d5e0d7; border-radius: 4px; font-size: 10px; white-space: nowrap; backdrop-filter: blur(8px); transition: border-color .3s, background .3s; }
+    .component-marker .dot { color: #879e8d; width: 4px; height: 4px; }
+    .component-marker[aria-pressed="true"] { background: #e2f3d9; color: #243d2b; border-color: #d4eacd; }
+    .component-marker[aria-pressed="true"] .dot { color: var(--teal); }
+    .component-marker.attention { border-color: #ba7b60; }
+    .component-marker.attention .dot { color: var(--coral); }
+    .stage-callout { position: absolute; bottom: 20px; left: 26px; right: 26px; display: flex; align-items: center; justify-content: space-between; gap: 16px; pointer-events: none; }
+    .focus-note { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .focus-note > svg { width: 19px; height: 19px; color: var(--lime); flex-shrink: 0; }
+    .focus-note strong { display: block; font-size: 11px; font-weight: 500; color: #dce9df; }
+    .focus-note span { display: block; font: 9px var(--mono); color: #8fa398; margin-top: 4px; }
+    .coordinate { font: 9px var(--mono); color: #6c8375; text-align: right; line-height: 1.8; }
+    .telemetry { border-top: 1px solid #34453c; padding: 16px 24px 12px; min-width: 0; background: #1c2320; }
+    .telemetry-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .channel-controls { display: flex; gap: 5px; }
+    .channel-controls button { display: inline-flex; gap: 7px; align-items: center; background: transparent; border: 1px solid transparent; padding: 6px 8px; border-radius: 4px; font-size: 10px; color: #97a89d; min-height: 28px; }
+    .channel-controls button[aria-pressed="true"] { color: var(--lime); background: #2f3e2d; border-color: #475941; }
+    .channel-controls button svg { width: 12px; height: 12px; }
+    .chart-reading { font: 16px var(--mono); color: #d9edd9; white-space: nowrap; }
+    .chart-reading span { font-size: 9px; color: #8ca693; }
+    .chart-wrap { margin: 7px 0 0; position: relative; height: 64px; }
+    #signal-canvas { width: 100%; height: 64px; display: block; }
+    .chart-meta { display: flex; justify-content: space-between; font: 8px var(--mono); color: #9db3a6; margin-top: 4px; }
+    .playback { margin-top: 10px; display: flex; gap: 10px; align-items: center; }
+    .playback .icon-button { width: 25px; height: 25px; border-color: #4b5c50; color: #d0e5d6; }
+    .playback .icon-button:hover { background: #3e5143; }
+    .playback svg { width: 12px; height: 12px; }
+    .playback input { flex: 1; accent-color: var(--lime); min-width: 30px; height: 3px; cursor: pointer; }
+    .playback time { font: 9px var(--mono); color: #b5ccbe; min-width: 37px; }
+    .playback select { background: #1c2320; color: #a5beaf; border: 0; font: 9px var(--mono); cursor: pointer; padding: 4px; }
+    .agent { background: var(--paper); border-left: 1px solid #455449; display: flex; flex-direction: column; min-width: 0; }
+    .agent-top { padding: 21px 24px 16px; display: flex; justify-content: space-between; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); }
+    .agent-brand { display: flex; align-items: center; gap: 9px; font: 500 16px var(--display); }
+    .agent-brand svg { width: 20px; height: 20px; color: var(--teal); }
+    .agent-status { font: 9px var(--mono); color: var(--teal); display: flex; align-items: center; gap: 5px; }
+    .agent-body { padding: 23px 24px 0; flex: 1; }
+    .agent-event { font: 10px var(--mono); color: #667b6c; display: flex; justify-content: space-between; gap: 8px; }
+    .agent-event span { color: var(--teal); }
+    .agent-headline { font-size: 29px; line-height: 1.18; margin-top: 13px; min-height: 70px; }
+    .agent-description { font-size: 12px; color: #607168; line-height: 1.85; margin-top: 12px; min-height: 68px; }
+    .task-list { margin: 23px 0 0; padding: 0; list-style: none; }
+    .task-list li { display: flex; align-items: center; gap: 10px; padding: 10px 0; color: #87938b; font-size: 11px; border-bottom: 1px solid #e4e9e5; }
+    .task-list li svg { width: 14px; height: 14px; flex-shrink: 0; }
+    .task-list li.active { color: var(--ink); font-weight: 600; }
+    .task-list li.done { color: var(--teal); }
+    .task-list .task-state { margin-left: auto; font: 8px var(--mono); font-weight: 400; }
+    .analysis-light { height: 2px; margin-top: 16px; background: #dae3dc; overflow: hidden; }
+    .analysis-light div { height: 100%; width: 0; background: var(--teal); transition: width .6s; }
+    .finding { border-top: 1px solid var(--line); margin: 23px -24px 0; padding: 18px 24px; }
+    .finding-title { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+    .finding-title h2 { font: 11px var(--body); font-weight: 600; }
+    .finding-title span { font: 8px var(--mono); color: #687a6c; }
+    .hypothesis { display: flex; align-items: center; gap: 8px; font-size: 11px; padding: 10px 0; }
+    .hypothesis > svg { width: 15px; height: 15px; color: #8c9c90; }
+    .hypothesis .result { margin-left: auto; color: var(--teal); background: #e7eee8; font: 8px var(--mono); padding: 4px 6px; border-radius: 3px; }
+    .hypothesis .result.caution { color: #8a4a30; background: #f6e5dd; }
+    .agent-actions { padding: 16px 24px 20px; border-top: 1px solid var(--line); }
+    .challenge { width: 100%; justify-content: space-between; min-height: 42px; }
+    .agent-actions .action-row { margin-top: 13px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .quiet-label { color: #718276; font: 9px var(--mono); }
+    .statusbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 25px; color: #9bae9f; background: #202925; border-top: 1px solid #3a4940; font: 8px var(--mono); }
+    .statusbar a { color: #b7cbbc; text-decoration: none; }
+    .statusbar a:hover { text-decoration: underline; }
+    .status-left { display: flex; align-items: center; gap: 8px; }
+    .status-left svg { width: 11px; height: 11px; }
+    .recorded-replay { position: absolute; top: 83px; left: 24px; z-index: 4; display: flex; align-items: center; flex-wrap: wrap; gap: 7px; max-width: min(520px, calc(100% - 48px)); padding: 7px 9px; border: 1px solid #53665b; border-radius: 4px; background: #18231fe8; box-shadow: 0 3px 14px #0002; }
+    .recorded-replay-head { display: flex; align-items: center; gap: 6px; flex: 1 0 100%; color: #c3d8ca; font: 8px var(--mono); }
+    .recorded-replay-head .dot { color: #93cbdc; }
+    .recorded-replay-values { display: flex; align-items: stretch; flex-wrap: wrap; gap: 4px; }
+    .replay-reading { min-width: 78px; border: 1px solid #42574a; border-radius: 3px; padding: 4px 6px; background: #24342c; color: #dceadf; text-align: left; }
+    .replay-reading:hover, .replay-reading[aria-pressed="true"] { border-color: #c9e69e; background: #354b3c; }
+    .replay-reading span { display: block; }
+    .replay-reading .reading-channel { color: #a8c4b1; font: 8px var(--mono); }
+    .replay-reading .reading-value { margin-top: 2px; font: 10px var(--mono); }
+    .recorded-replay-note { flex: 1 0 100%; color: #97aa9e; font-size: 8px; line-height: 1.35; }
+    dialog { color: var(--ink); background: var(--paper); padding: 0; border: 1px solid #b2c4b7; border-radius: 8px; width: min(570px, calc(100% - 28px)); max-height: 90svh; box-shadow: 0 20px 90px #0005; }
+    dialog::backdrop { background: #101816ad; backdrop-filter: blur(5px); }
+    .dialog-head { padding: 20px 24px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .dialog-head h2 { font-size: 21px; }
+    .dialog-body { padding: 24px; }
+    .dialog-body > p { color: var(--muted); font-size: 12px; line-height: 1.8; margin-bottom: 16px; }
+    .dropzone { padding: 26px 16px; border: 1px dashed #9eafa3; background: #ebf0eb; text-align: center; border-radius: 6px; }
+    .dropzone.dragover { background: #d8ebd6; border-color: var(--teal); }
+    .dropzone > svg { color: var(--teal); margin: 0 auto 13px; width: 25px; height: 25px; }
+    .dropzone label { display: block; font-size: 13px; font-weight: 600; }
+    .dropzone input { display: block; max-width: 100%; margin: 14px auto 0; font-size: 11px; }
+    .dropzone p { font-size: 10px; color: #688071; margin-top: 12px; line-height: 1.7; }
+    .dialog-footer { padding: 16px 24px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    details { color: #718376; font-size: 11px; line-height: 1.7; margin-top: 18px; }
+    summary { cursor: pointer; }
+    details p { margin-top: 10px; }
+    code { font: 10px var(--mono); overflow-wrap: anywhere; }
+    .message { display: block; font-size: 12px; line-height: 1.8; color: var(--teal); margin-top: 14px; overflow-wrap: anywhere; }
+    .message.error { color: #ab4137; }
+    .case-row { width: 100%; display: grid; grid-template-columns: 38px minmax(0,1fr) 18px; gap: 14px; align-items: center; padding: 18px 0; border: 0; border-bottom: 1px solid var(--line); background: transparent; text-align: left; }
+    .case-row:hover { background: #e7eee7; }
+    .case-row > svg { width: 16px; height: 16px; }
+    .case-art { width: 38px; height: 40px; background: #e6eddd; color: #617c47; border-radius: 5px; display: grid; place-items: center; }
+    .case-art.coral { background: #f4e3dd; color: #a56d54; }
+    .case-art.blue { background: #e1eef1; color: #4e7d8a; }
+    .case-art svg { width: 19px; height: 19px; }
+    .case-row strong { font-size: 13px; font-weight: 500; }
+    .case-row small { display: block; color: var(--muted); font-size: 10px; margin-top: 6px; }
+    .report-status { display: flex; align-items: center; gap: 6px; color: #906049; font: 10px var(--mono); margin-bottom: 16px; }
+    .report-title { font: 500 24px var(--display); line-height: 1.3; }
+    .report-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; }
+    .report-meta dt { font: 9px var(--mono); color: var(--muted); }
+    .report-meta dd { font-size: 11px; margin: 5px 0 0; overflow-wrap: anywhere; }
+    .report-body { font-size: 12px; color: #597363; line-height: 1.8; padding: 14px 0; border-block: 1px solid var(--line); }
+    .note-label { display: block; font-size: 11px; margin: 17px 0 8px; }
+    textarea { width: 100%; min-height: 72px; padding: 10px; border: 1px solid #c5d1c7; border-radius: 4px; background: #fafcf9; resize: vertical; font-size: 12px; }
+    .review-check { margin-top: 13px; display: flex; align-items: flex-start; gap: 8px; color: var(--muted); font-size: 10px; line-height: 1.7; }
+    .review-check input { accent-color: var(--teal); margin-top: 3px; }
+    .evidence-lines { margin: 0; padding: 0; list-style: none; }
+    .evidence-lines li { padding: 14px 0; border-bottom: 1px solid var(--line); font-size: 11px; line-height: 1.8; }
+    .evidence-lines strong { font-weight: 600; color: var(--teal); display: block; }
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 20; max-width: min(500px, calc(100% - 32px)); background: #d4edc5; color: #253d2a; border: 1px solid #97b791; padding: 12px 18px; font-size: 12px; line-height: 1.6; border-radius: 5px; box-shadow: 0 8px 30px #0003; }
+    .animate-in { animation: reveal .45s ease both; }
+    .live-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 24px; border-bottom: 1px solid var(--line); }
+    .live-controls select { max-width: 170px; min-width: 0; border: 1px solid var(--line); background: white; padding: 8px; border-radius: 4px; font-size: 11px; }
+    .live-controls .icon-button { width: 32px; height: 32px; }
+    .live-controls .live-run { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; padding: 7px 12px; font-size: 11px; white-space: nowrap; }
+    .live-guidance { margin: 0; padding: 9px 24px 12px; color: var(--muted); border-bottom: 1px solid var(--line); font-size: 10px; line-height: 1.6; }
+    .sensor-select { max-width: 170px; color: #d3e8d9; background: #24352b; border: 1px solid #4b6252; border-radius: 4px; padding: 4px; font: 9px var(--mono); }
+    .live-task { width: 100%; background: none; border: 0; text-align: left; font-size: 10px; padding: 4px 0; color: var(--teal); overflow-wrap: anywhere; }
+    .live-observation { display: block; margin-top: 9px; font-size: 11px; }
+    .evidence-value { white-space: pre-wrap; font: 10px var(--mono); overflow-wrap: anywhere; color: #425f4e; }
+    body.real-workspace .agent-headline { font-size: 26px; overflow-wrap: anywhere; }
+    body.real-workspace .agent-description { min-height: 70px; }
+    body.real-workspace .task-list { max-height: 145px; overflow-y: auto; }
+    body.real-workspace .source-name { max-width: 250px; }
+    @media(max-width:490px) { .live-controls { padding: 10px 16px; } .live-guidance { padding: 8px 16px 10px; } body.real-workspace .task-list { display: block; max-height: 100px; } .live-controls select { max-width: 200px; } }
+    @keyframes reveal { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    @media (min-width: 1500px) {
+      .workbench { grid-template-columns: minmax(0,1fr) 440px; min-height: calc(100svh - 161px); }
+      .agent-body { padding: 27px 30px 0; }
+      .agent-top { padding-inline: 30px; }
+      .agent-headline { font-size: 33px; }
+      .agent-description { font-size: 13px; }
+      .task-list { margin-top: 30px; }
+      .task-list li { padding: 14px 0; }
+      .finding { margin-inline: -30px; padding: 24px 30px; }
+      .agent-actions { padding-inline: 30px; }
+    }
+    @media (max-width: 1150px) {
+      .workbench { grid-template-columns: minmax(0,1fr) 345px; }
+      .agent-top, .agent-actions { padding-inline: 20px; }
+      .agent-body { padding: 21px 20px 0; }
+      .agent-headline { font-size: 26px; }
+      .finding { margin-inline: -20px; padding-inline: 20px; }
+      .source-link, .source-separator, .workspace-name { display: none; }
+      .stage-tools { right: 15px; }
+      .stage-heading { left: 20px; }
+      .stage-heading h1 { font-size: 21px; }
+      .telemetry { padding-inline: 20px; }
+    }
+    @media (max-width: 820px) {
+      .topbar { height: 61px; padding-inline: 16px; }
+      .brand-divider { display: none; }
+      .top-actions { gap: 7px; }
+      .top-actions .button { padding: 7px 10px; }
+      .demo-badge { display: none; }
+      .sourcebar { padding: 11px 16px; }
+      .source-name { max-width: 235px; }
+      .workbench { display: flex; flex-direction: column; min-height: 0; }
+      .agent { order: -1; border-left: 0; }
+      .agent-top { padding: 14px 20px; }
+      .agent-body { display: grid; grid-template-columns: minmax(0,1fr) minmax(180px,.65fr); gap: 0 22px; padding: 17px 20px 0; }
+      .agent-event, .agent-headline, .agent-description { grid-column: 1; }
+      .agent-headline { min-height: 0; margin-top: 8px; font-size: 25px; }
+      .agent-description { min-height: 0; margin-top: 8px; }
+      .task-list { grid-column: 2; grid-row: 1 / span 3; margin-top: 0; }
+      .task-list li { font-size: 10px; gap: 7px; padding: 10px 0; }
+      .task-state { display: none; }
+      .analysis-light { grid-column: 1 / -1; }
+      .finding { grid-column: 1 / -1; margin-top: 16px; padding-block: 12px; }
+      .hypothesis { display: inline-flex; width: calc(50% - 8px); }
+      .hypothesis + .hypothesis { margin-left: 11px; }
+      .agent-actions { display: flex; align-items: center; gap: 20px; padding-block: 12px; }
+      .challenge { width: auto; min-width: 180px; }
+      .agent-actions .action-row { flex: 1; margin: 0; }
+      .quiet-label { display: none; }
+      .machine-space { grid-template-rows: 400px 190px; }
+      .stage { min-height: 400px; }
+      .stage-heading { top: 18px; }
+      .stage-tools { top: 18px; }
+      .statusbar { flex-wrap: wrap; line-height: 1.8; padding-inline: 18px; }
+    }
+    @media (max-width: 490px) {
+      .wordmark { font-size: 19px; }
+      .brand-icon { width: 29px; height: 29px; }
+      .topbar { padding-inline: 12px; gap: 9px; }
+      .top-actions .button span { display: none; }
+      .top-actions .button { width: 33px; padding: 7px; }
+      .top-actions .icon-button { width: 32px; height: 32px; }
+      .identity { gap: 8px; }
+      .sourcebar { padding-inline: 14px; gap: 10px; }
+      .source-name { max-width: 180px; font-size: 10px; }
+      .run-status { font-size: 8px; }
+      .source-meta { font-size: 9px; }
+      .agent-top { padding: 12px 16px; }
+      .agent-body { grid-template-columns: 1fr; padding: 16px 16px 0; }
+      .agent-headline { font-size: 25px; line-height: 1.2; min-height: 60px; }
+      .agent-description { font-size: 11px; min-height: 58px; line-height: 1.75; }
+      .task-list { grid-column: 1; grid-row: auto; display: flex; margin-top: 10px; gap: 8px; }
+      .task-list li { border: 0; flex: 1; padding: 6px 0; line-height: 1.5; align-items: flex-start; font-size: 9px; }
+      .task-list li svg { margin-top: 1px; width: 11px; height: 11px; }
+      .finding { margin: 12px -16px 0; padding: 10px 16px; }
+      .hypothesis { font-size: 10px; width: calc(50% - 7px); gap: 5px; padding: 8px 0 3px; }
+      .hypothesis > svg { display: none; }
+      .hypothesis .result { font-size: 7px; padding: 3px; }
+      .agent-actions { padding: 12px 16px; gap: 12px; }
+      .challenge { min-width: 0; flex: 1; font-size: 11px; padding-inline: 11px; }
+      .agent-actions .action-row { flex: 0 0 auto; }
+      .action-row .text-button { font-size: 10px; }
+      .machine-space { grid-template-rows: 345px 186px; }
+      .stage { min-height: 345px; }
+      .stage-heading { left: 16px; top: 17px; }
+      .stage-heading h1 { font-size: 19px; }
+      .stage-heading p { font-size: 8px; }
+      .stage-heading .eyebrow { font-size: 8px; }
+      .stage-tools { top: 17px; right: 12px; gap: 4px; }
+      .stage-tools .icon-button { width: 28px; height: 28px; }
+      .stage-tools svg { width: 13px; height: 13px; }
+      .stage-callout { left: 16px; right: 16px; bottom: 15px; }
+      .coordinate { display: none; }
+      .focus-note strong { font-size: 10px; }
+      .focus-note span { font-size: 8px; }
+      .component-marker { font-size: 8px; padding: 5px 6px; gap: 4px; }
+      .telemetry { padding-inline: 16px; }
+      .channel-controls { gap: 1px; }
+      .channel-controls button { font-size: 9px; padding: 5px 6px; gap: 4px; }
+      .channel-controls button svg { width: 10px; height: 10px; }
+      .chart-reading { font-size: 13px; }
+      .chart-reading span { font-size: 8px; }
+      .dialog-body { padding: 18px; }
+      .dialog-head, .dialog-footer { padding: 16px 18px; }
+      .dialog-footer { flex-wrap: wrap; }
+    }
+    [hidden] { display: none !important; }
+    body.real-workspace .machine-space { grid-template-rows: minmax(370px, 1fr) auto; }
+    body.real-workspace .telemetry { min-height: 250px; padding-bottom: 14px; }
+    .review-toolbar, .window-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .window-tools { border-top: 1px solid #405248; padding-top: 10px; margin-top: 8px; }
+    .window-tools label { font: 9px var(--mono); color: #b5c7be; display: flex; align-items: center; gap: 5px; }
+    .window-tools input { width: 65px; padding: 6px; border: 1px solid #607668; border-radius: 4px; background: #23342c; color: #e5f0e8; font: 10px var(--mono); }
+    .window-tools select { max-width: 155px; }
+    .window-tools .icon-button, .plot-controls .icon-button { width: 29px; height: 29px; color: #e5f0e8; border-color: #53685a; }
+    .plot-controls { display: flex; gap: 4px; margin-left: auto; }
+    .plot-controls [aria-pressed="true"] { background: #c4e799; color: #203124; }
+    .sourcebar select { max-width: 180px; padding: 7px; border: 1px solid #607668; background: #24372c; color: #e2eddf; border-radius: 4px; font: 11px var(--body); }
+    .auth-form { display: grid; gap: 14px; }
+    .auth-form input, .recording-search, .reviewer-input, .review-decision { width: 100%; min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 4px; background: white; color: var(--ink); font: 12px var(--body); }
+    .auth-form label { font-size: 12px; }
+    .library-group { margin: 20px 0 8px; font: 12px var(--mono); color: var(--teal); }
+    .review-toolbar { padding: 10px 0; }
+    .review-toolbar .reviewer-input, .review-toolbar .review-decision { flex: 1 1 150px; }
+    .live-observation { overflow-wrap: anywhere; line-height: 1.8; }
+    .history-status { font: 9px var(--mono); color: var(--muted); }
+    .evidence-line-actions { display: flex; gap: 12px; margin-top: 10px; }
+    .evidence-value { max-height: 240px; overflow: auto; }
+    #history-dialog { width: min(690px, calc(100% - 28px)); }
+    #report-dialog { width: min(720px, calc(100% - 28px)); }
+    .question-box { display: grid; gap: 7px; padding: 11px 24px; border-bottom: 1px solid var(--line); }
+    .question-box[hidden] { display: none; }
+    .question-box > summary { color: var(--teal); cursor: pointer; font-size: 10px; font-weight: 600; }
+    .question-content { display: grid; gap: 7px; padding-top: 5px; }
+    .question-box label { color: #33483b; font-size: 10px; font-weight: 600; }
+    .question-box textarea { min-height: 52px; max-height: 100px; resize: vertical; padding: 8px 9px; font-size: 11px; }
+    .question-prompts { display: flex; flex-wrap: wrap; gap: 4px; }
+    .question-prompt { border: 1px solid #cbd7cd; border-radius: 3px; padding: 4px 6px; background: #f2f5f1; color: #42574a; font-size: 8px; text-align: left; }
+    .question-prompt:hover { background: #e3eee2; border-color: #8da992; }
+    .question-context { color: #6a7c70; font: 8px var(--mono); line-height: 1.45; }
+    .question-submit { justify-self: end; min-height: 32px; padding: 6px 10px; font-size: 10px; }
+    #access-open[aria-pressed="true"] { background: #d0e7bb; color: #22492e; }
+    @media (max-width: 820px) {
+      body.real-workspace .machine-space { grid-template-rows: 400px auto; }
+      .sourcebar { flex-wrap: wrap; }
+      .sourcebar .run-status { margin-left: auto; }
+      body.real-workspace .chart-meta { flex-wrap: wrap; gap: 7px; }
+      .question-box { padding-inline: 20px; }
+    }
+    @media (max-width: 490px) {
+      body.real-workspace .machine-space { grid-template-rows: 360px auto; }
+      body.real-workspace .telemetry-top { flex-wrap: wrap; gap: 8px; }
+      body.real-workspace .channel-controls { flex: 1 0 100%; }
+      body.real-workspace .stage { min-height: 360px; }
+      .sourcebar select { max-width: 140px; font-size: 10px; }
+      .window-tools { gap: 6px; }
+      body.real-workspace .hypothesis { display: flex; width: 100%; }
+      body.real-workspace .hypothesis + .hypothesis { margin-left: 0; }
+      body.real-workspace .chart-reading { max-width: 125px; text-align: right; overflow-wrap: anywhere; }
+      .plot-controls { gap: 2px; }
+      .recorded-replay { top: 78px; left: 12px; max-width: calc(100% - 24px); gap: 4px; padding: 6px; }
+      .replay-reading { min-width: 70px; padding: 4px; }
+      .recorded-replay-note { font-size: 7px; }
+      .question-box { padding: 9px 16px; }
+      .question-prompts { gap: 3px; }
+      .question-prompt { font-size: 7px; }
+    }
+    @media print {
+      body > :not(#report-dialog) { display: none !important; }
+      #report-dialog { display: block; position: static; width: 100%; max-height: none; border: 0; box-shadow: none; margin: 0; }
+      #report-dialog .dialog-footer, #report-dialog button, #report-dialog input, #report-dialog textarea, #report-dialog select { display: none; }
+      #report-dialog::backdrop { display: none; }
+      #report-body { color: black; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="identity"><div class="brand-icon"><i data-lucide="scan-line"></i></div><span class="wordmark">faultscope</span><span class="brand-divider"></span><span class="workspace-name">Investigation lab <span class="mono">/ 01</span></span></div>
+    <nav class="top-actions" aria-label="Workspace actions">
+      <button class="demo-badge" id="about-open"><span class="dot"></span>DEMO / SCRIPTED AI</button>
+      <button class="button" id="casebook-open" title="Open demo cases" aria-label="Open demo cases"><i data-lucide="layers-2"></i><span>Casebook</span></button>
+      <button class="button primary" id="import-open" title="Import a recording" aria-label="Import a recording"><i data-lucide="upload"></i><span>Import recording</span></button>
+      <button class="icon-button" id="report-open" title="Open investigation brief" aria-label="Open investigation brief"><i data-lucide="file-check-2"></i></button>
+    </nav>
+  </header>
+  <main class="app">
+    <section class="sourcebar" aria-label="Recording source">
+      <div class="source"><i data-lucide="file-audio-2"></i><div><div class="source-name" id="source-name">mixed-signals.demo.json</div><div class="source-meta" id="source-meta">Synthetic recording / 61 samples / 60 seconds</div></div><div class="source-separator"></div><div class="source-link"><span>RECORDING</span><i data-lucide="arrow-right"></i><span>ANALYSIS</span><i data-lucide="arrow-right"></i><span>FINDING</span></div></div>
+      <div class="run-status"><span class="dot"></span><span id="run-status">REPLAY RUNNING</span></div>
+    </section>
+    <div class="workbench">
+      <section class="machine-space" aria-label="Equipment and measured evidence">
+        <div class="stage" id="stage">
+          <div class="stage-heading"><div class="eyebrow"><span class="dot" style="color:var(--lime)"></span>LAB ASSET / HYD-01</div><h1>Hydraulic system</h1><p>Illustrative assembly. No live equipment connected.</p></div>
+          <div class="stage-tools"><button class="icon-button" id="explode" aria-label="Separate components" title="Separate components" aria-pressed="false"><i data-lucide="expand"></i></button><button class="icon-button" id="rotate" title="Rotate equipment view" aria-label="Rotate equipment view"><i data-lucide="rotate-3d"></i></button><button class="icon-button" id="recenter" title="Reset equipment view" aria-label="Reset equipment view"><i data-lucide="focus"></i></button></div>
+          <div id="machine-canvas" aria-hidden="true"></div>
+          <section id="recorded-replay" class="recorded-replay" aria-label="Archived replay measurements" hidden>
+            <div class="recorded-replay-head"><span class="dot"></span><span>ARCHIVED RECORDING / NOT A LIVE MACHINE</span><time id="replay-clock">00:00</time></div>
+            <div id="replay-readings" class="recorded-replay-values"></div>
+            <div id="replay-note" class="recorded-replay-note">Values follow the replay cursor; each is the nearest displayed point in the preview.</div>
+          </section>
+          <div class="render-fallback" id="render-fallback" hidden>3D is unavailable in this browser. Signal replay and the investigation controls remain available.</div>
+          <fieldset class="components"><legend class="sr-only">Equipment components</legend>
+            <button class="component-marker" id="marker-pump" data-component="pump" style="left:25%;top:53%" aria-pressed="false"><span class="dot"></span>Pump</button>
+            <button class="component-marker" id="marker-valve" data-component="valve" style="left:49%;top:44%" aria-pressed="true"><span class="dot"></span>Control valve</button>
+            <button class="component-marker" id="marker-accumulator" data-component="accumulator" style="left:75%;top:35%" aria-pressed="false"><span class="dot"></span>Accumulator</button>
+            <button class="component-marker" id="marker-cooler" data-component="cooler" style="left:68%;top:70%" aria-pressed="false"><span class="dot"></span>Cooler</button>
+            <button class="component-marker" id="marker-drive" data-component="drive" hidden aria-pressed="false"><span class="dot"></span>Drive motor</button>
+            <button class="component-marker" id="marker-support" data-component="support" hidden aria-pressed="false"><span class="dot"></span>Support bearing</button>
+            <button class="component-marker" id="marker-bearing" data-component="bearing" hidden aria-pressed="false"><span class="dot"></span>Test bearing</button>
+            <button class="component-marker" id="marker-encoder" data-component="encoder" hidden aria-pressed="false"><span class="dot"></span>Encoder</button>
+          </fieldset>
+          <div class="stage-callout"><div class="focus-note"><i data-lucide="crosshair"></i><div><strong id="focus-title">Pressure response in focus</strong><span id="focus-subtitle">PS1 / RECORDED SIGNAL</span></div></div><div class="coordinate">TEST RIG CONCEPT<br>4 COMPONENTS / 3 CHANNELS</div></div>
+        </div>
+        <section class="telemetry" aria-label="Recording signals">
+          <div class="telemetry-top"><fieldset class="channel-controls"><legend class="sr-only">Signal channel</legend><button data-channel="pressure" aria-pressed="true"><i data-lucide="gauge"></i>Pressure</button><button data-channel="flow" aria-pressed="false"><i data-lucide="waves"></i>Flow</button><button data-channel="temperature" aria-pressed="false"><i data-lucide="thermometer"></i>Temperature</button></fieldset><div class="chart-reading" id="chart-reading">170.0 <span>bar</span></div></div>
+          <figure class="chart-wrap"><canvas id="signal-canvas" aria-describedby="chart-summary">Signal chart. The evidence trail contains numerical summaries.</canvas><figcaption class="sr-only" id="chart-summary">Pressure from the synthetic recording. The selected sample value is shown above.</figcaption></figure>
+          <div class="chart-meta"><span id="chart-range">SYNTHETIC / PRESSURE</span><span id="chart-window">0 - 60 SECONDS</span></div>
+          <div class="playback"><button class="icon-button" id="play" title="Pause replay" aria-label="Pause replay"><i data-lucide="pause"></i></button><input type="range" id="scrubber" min="0" max="60" step="0.1" value="0" aria-label="Recording position in seconds"><time id="play-time">00:00</time><select id="speed" aria-label="Replay speed"><option value="1">1x</option><option value="2" selected>2x</option><option value="4">4x</option></select><button class="icon-button" id="replay" title="Restart investigation" aria-label="Restart investigation"><i data-lucide="rotate-ccw"></i></button></div>
+        </section>
+      </section>
+      <aside class="agent" aria-label="AI investigation">
+        <div class="agent-top"><div class="agent-brand"><i data-lucide="sparkles"></i>FaultScope AI</div><div class="agent-status"><span class="dot"></span><span id="agent-state">OBSERVING</span></div></div>
+        <div class="agent-body">
+          <div class="agent-event">INVESTIGATION 0142<span id="event-number">01 / 05</span></div>
+          <h2 class="agent-headline" id="agent-headline">A recording arrives.<br>An investigation begins.</h2>
+          <p class="agent-description" id="agent-description">I'm checking this pressure cycle, then looking for supporting or conflicting evidence in the other channels.</p>
+          <ol class="task-list" id="task-list">
+            <li class="active" data-task="0"><i data-lucide="scan-line"></i><span>Inspect pressure</span><span class="task-state">ACTIVE</span></li>
+            <li data-task="1"><i data-lucide="waves"></i><span>Cross-check flow</span><span class="task-state">QUEUED</span></li>
+            <li data-task="2"><i data-lucide="git-compare-arrows"></i><span>Test alternatives</span><span class="task-state">QUEUED</span></li>
+          </ol>
+          <div class="analysis-light" aria-hidden="true"><div id="analysis-progress"></div></div>
+          <section class="finding" aria-label="Working hypotheses"><div class="finding-title"><h2 id="finding-label">Working hypotheses</h2><span>NOT A DIAGNOSIS</span></div><div class="hypothesis"><i data-lucide="sliders-horizontal"></i><span id="hypothesis-one">Valve response</span><span class="result" id="result-one">PENDING</span></div><div class="hypothesis"><i data-lucide="cylinder"></i><span id="hypothesis-two">Accumulator</span><span class="result" id="result-two">PENDING</span></div></section>
+        </div>
+        <details id="question-box" class="question-box">
+          <summary>Ask about this recorded interval</summary>
+          <form id="engineer-question-form" class="question-content">
+            <label for="engineer-question">What should Gemini check?</label>
+            <textarea id="engineer-question" maxlength="500" placeholder="What changes in pressure here, and what evidence from other channels supports or contradicts it?"></textarea>
+            <div class="question-prompts" aria-label="Suggested questions">
+              <button class="question-prompt" type="button">Explain this signal change</button>
+              <button class="question-prompt" type="button">What contradicts this pattern?</button>
+              <button class="question-prompt" type="button">What cannot be concluded?</button>
+            </div>
+            <div id="question-context" class="question-context"></div>
+            <button id="ask-investigation" class="button primary question-submit" type="submit"><i data-lucide="sparkles"></i><span>Investigate</span></button>
+          </form>
+        </details>
+        <div class="agent-actions"><button class="button primary challenge" id="challenge" disabled><span>Challenge finding</span><i data-lucide="git-pull-request-arrow"></i></button><div class="action-row"><button class="text-button" id="evidence-open"><i data-lucide="scan-eye"></i>Evidence trail</button><span class="quiet-label">HUMAN DECISION / ALWAYS</span></div></div>
+      </aside>
+    </div>
+    <footer class="statusbar"><div class="status-left"><i data-lucide="shield-check"></i><span id="mode-footer">SYNTHETIC SIGNALS / SCRIPTED AI / READ-ONLY CONCEPT</span></div><a href="https://archive.ics.uci.edu/dataset/447/condition+monitoring+of+hydraulic+systems" target="_blank" rel="noopener noreferrer">Research foundation: UCI hydraulic systems &nearr;</a></footer>
+  </main>
+  <dialog id="import-dialog" aria-labelledby="import-title">
+    <div class="dialog-head"><h2 id="import-title">Bring a recording.</h2><button class="icon-button" data-close title="Close import" aria-label="Close import"><i data-lucide="x"></i></button></div>
+    <div class="dialog-body"><p>Public or non-confidential recordings only. Files stay in this browser. Imported data can be visualized and validated; live AI is not connected.</p><div class="dropzone" id="dropzone"><i data-lucide="file-up"></i><label for="file-input">Drop a JSON recording</label><input type="file" id="file-input" accept=".json,application/json"><p>Exported sensor readings / 2 MB maximum</p></div><output class="message" id="import-message" aria-live="polite"></output><details><summary>Recording format &amp; instrument connection</summary><p>Use the downloadable sample structure: <code>asset_id</code>, <code>units</code> and 2-10,000 <code>samples</code>. Every sample has <code>time_s</code>, <code>pressure_bar</code>, <code>flow_l_min</code> and <code>temperature_c</code>. Units: s, bar, L/min, C. Missing readings may be null and are flagged.</p><p>Input path: sensors &rarr; existing recorder &rarr; exported file. Vendor formats and direct instrument connections need separately validated adapters. No PLC, MQTT or OPC UA connection exists in this demo.</p></details></div>
+    <div class="dialog-footer"><button class="text-button" id="sample-download"><i data-lucide="download"></i>Download sample JSON</button><button class="button primary" id="use-import" disabled>Open recording<i data-lucide="arrow-up-right"></i></button></div>
+  </dialog>
+  <dialog id="casebook-dialog" aria-labelledby="casebook-title">
+    <div class="dialog-head"><h2 id="casebook-title">Three cases. Different decisions.</h2><button class="icon-button" data-close title="Close casebook" aria-label="Close casebook"><i data-lucide="x"></i></button></div>
+    <div class="dialog-body"><p>Synthetic recordings. Each runs a labeled, scripted investigation in the live workspace.</p>
+      <button class="case-row" data-case="mixed"><span class="case-art coral"><i data-lucide="activity"></i></span><span><strong>Mixed signals</strong><small>Pressure changes. The explanation is less clear.</small></span><i data-lucide="arrow-up-right"></i></button>
+      <button class="case-row" data-case="gap"><span class="case-art blue"><i data-lucide="unplug"></i></span><span><strong>A gap in the evidence</strong><small>Missing flow readings interrupt the investigation.</small></span><i data-lucide="arrow-up-right"></i></button>
+      <button class="case-row" data-case="stable"><span class="case-art"><i data-lucide="audio-lines"></i></span><span><strong>A quieter cycle</strong><small>No escalation in this scripted scenario.</small></span><i data-lucide="arrow-up-right"></i></button>
+    </div>
+  </dialog>
+  <dialog id="report-dialog" aria-labelledby="report-dialog-title">
+    <div class="dialog-head"><h2 id="report-dialog-title">Investigation brief</h2><button class="icon-button" data-close title="Close brief" aria-label="Close brief"><i data-lucide="x"></i></button></div>
+    <div class="dialog-body"><div class="report-status"><span class="dot"></span><span id="report-status">IN PROGRESS</span></div><h3 class="report-title" id="report-title">Investigation in progress</h3><dl class="report-meta"><div><dt>SOURCE</dt><dd id="report-source"></dd></div><div><dt>MODE</dt><dd id="report-mode">Scripted AI preview</dd></div></dl><p class="report-body" id="report-body"></p><label class="note-label" for="review-note">Engineer note</label><textarea id="review-note" maxlength="2000" placeholder="Add a question or context for review"></textarea><label class="review-check"><input id="reviewed" type="checkbox">Reviewed as a concept demonstration. This does not authorize equipment operation or repair.</label><output class="message" id="export-status" aria-live="polite"></output></div>
+    <div class="dialog-footer"><span class="eyebrow muted">No work order is created</span><button class="button primary" id="download-report"><i data-lucide="download"></i>Export brief</button></div>
+  </dialog>
+  <dialog id="evidence-dialog" aria-labelledby="evidence-title">
+    <div class="dialog-head"><h2 id="evidence-title">The evidence trail</h2><button class="icon-button" data-close title="Close evidence" aria-label="Close evidence"><i data-lucide="x"></i></button></div><div class="dialog-body"><p id="evidence-context">Activities are scripted. Signal statistics below are calculated from the current recording.</p><ul class="evidence-lines" id="evidence-lines"></ul></div><div class="dialog-footer"><span class="eyebrow muted">Source-linked / reviewable</span><button class="button" id="view-pressure">Focus pressure trace<i data-lucide="arrow-up-right"></i></button></div>
+  </dialog>
+  <dialog id="about-dialog" aria-labelledby="about-title"><div class="dialog-head"><h2 id="about-title">An interaction prototype.</h2><button class="icon-button" data-close title="Close information" aria-label="Close information"><i data-lucide="x"></i></button></div><div class="dialog-body"><p>This is a product experience preview, not a deployed diagnostic system. Built-in recordings are synthetic; agent choices, findings and challenges are scripted. Charts and exported measurements are calculated from those same recordings.</p><p>The 3D assembly is an original illustration, not a calibrated digital twin or a depiction of the UCI rig. Imported recordings remain local and do not receive scripted diagnoses. No paid service, Gemini endpoint or equipment control is connected.</p><p>Research uses the public UCI hydraulic benchmark. Field accuracy, time savings and operational benefit are not established by this demo.</p></div></dialog>
+  <output id="toast" class="toast" aria-live="polite" hidden></output>
+  <script>
+    'use strict';
+    const LIVE_APP_MODE = ['http:', 'https:'].includes(location.protocol) && location.pathname !== '/demo';
+    const element = identifier => document.getElementById(identifier);
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const state = {
+      caseId: 'mixed', record: null, fileName: '', seconds: 0, rate: 2,
+      playing: true, channel: 'pressure', focus: 'valve', exploded: false,
+      challenged: false, challenging: false, imported: false, stage: -1,
+      generation: 0, pendingImport: null, yaw: 0.55, pitch: 0.60,
+      targetYaw: 0.55, targetPitch: 0.60, manualFocusUntil: 0,
+      liveRecord: null, liveSensor: 'PS1', evidenceWindow: null,
+      flowPhase: 0, recordedFlowRatio: 0.5, recordedVibrationRatio: 0
+    };
+    const channelInfo = {
+      pressure: { field: 'pressure_bar', unit: 'bar', label: 'Pressure', color: '#d3f891', sensor: 'PS1' },
+      flow: { field: 'flow_l_min', unit: 'L/min', label: 'Flow', color: '#93cbdc', sensor: 'FS1' },
+      temperature: { field: 'temperature_c', unit: 'C', label: 'Temperature', color: '#f09478', sensor: 'TS1' }
+    };
+    const componentInfo = {
+      pump: { title: 'Pump / pressure and flow', subtitle: 'SUPPLIES FLUID / PRESSURE EVIDENCE', channel: 'pressure' },
+      valve: { title: 'Control valve / pressure response', subtitle: 'DIRECTS FLUID / PRESSURE EVIDENCE', channel: 'pressure' },
+      accumulator: { title: 'Accumulator / competing explanation', subtitle: 'STORES PRESSURIZED FLUID / NOT DIRECTLY MEASURED', channel: 'flow' },
+      cooler: { title: 'Cooler / temperature context', subtitle: 'REMOVES HEAT / TEMPERATURE EVIDENCE', channel: 'temperature' },
+      drive: { title: 'Drive motor / reference assembly', subtitle: 'ILLUSTRATIVE ROTATION / NOT MEASURED RPM' },
+      support: { title: 'Support bearing / reference assembly', subtitle: 'SHAFT SUPPORT / NO DEDICATED SENSOR' },
+      bearing: { title: 'Instrumented bearing housing', subtitle: 'VIB_RAW / RECORDED SENSOR OUTPUT' },
+      encoder: { title: 'Shaft encoder', subtitle: 'ENC_RAW / NO RPM CALIBRATION APPLIED' }
+    };
+    const cases = {
+      mixed: { name: 'Mixed signals', file: 'mixed-signals.demo.json' },
+      gap: { name: 'A gap in the evidence', file: 'missing-flow.demo.json' },
+      stable: { name: 'A quieter cycle', file: 'quiet-cycle.demo.json' }
+    };
+    const stories = {
+      mixed: [
+        { headline: 'A recording arrives. An investigation begins.', detail: "I'm checking this pressure cycle, then looking for supporting or conflicting evidence in the other channels.", status: 'OBSERVING', task: 0, focus: 'valve', channel: 'pressure', first: 'PENDING', second: 'PENDING' },
+        { headline: 'Pressure changed. What else changed?', detail: "A variation appears in the selected pressure window. I'm comparing the flow signal before attributing it to a component.", status: 'INVESTIGATING', task: 1, focus: 'pump', channel: 'flow', first: 'OPEN', second: 'OPEN' },
+        { headline: 'One reading. More than one explanation.', detail: "The pressure and flow views do not isolate the valve. I'm retaining an accumulator explanation rather than forcing a single answer.", status: 'CROSS-CHECKING', task: 2, focus: 'valve', channel: 'pressure', first: 'PLAUSIBLE', second: 'OPEN' },
+        { headline: 'The alternative still needs evidence.', detail: 'There is no direct accumulator-pressure channel in this recording. The available traces cannot settle the competing explanation.', status: 'QUALIFYING', task: 2, focus: 'accumulator', channel: 'flow', first: 'UNRESOLVED', second: 'UNMEASURED' },
+        { headline: 'Bring the evidence. Withhold the diagnosis.', detail: 'The review packet preserves both explanations and the missing measurement. An engineer, not this preview, decides the next physical action.', status: 'REVIEW READY', task: 3, focus: 'accumulator', channel: 'flow', first: 'UNRESOLVED', second: 'UNRESOLVED' }
+      ],
+      gap: [
+        { headline: 'A recording arrives. Checking its continuity.', detail: "I'm reviewing the available readings before treating this recording as complete evidence.", status: 'OBSERVING', task: 0, focus: 'pump', channel: 'pressure', first: 'PENDING', second: 'PENDING' },
+        { headline: 'The flow signal goes missing.', detail: 'Twelve flow samples are null. A missing measurement is not a measurement of zero flow.', status: 'DATA GAP', task: 1, focus: 'pump', channel: 'flow', first: 'BLOCKED', second: 'BLOCKED' },
+        { headline: 'No filling gaps with confident guesses.', detail: 'The preview stops component attribution. Pressure alone is not enough to replace the missing evidence.', status: 'WITHHELD', task: 2, focus: 'valve', channel: 'flow', first: 'WITHHELD', second: 'WITHHELD' },
+        { headline: 'The next step is a better recording.', detail: 'Request the missing channel export or have an engineer review the recording. No repair recommendation is supported.', status: 'REVIEW READY', task: 3, focus: 'pump', channel: 'flow', first: 'WITHHELD', second: 'WITHHELD' },
+        { headline: 'A data-quality finding, not a machine fault.', detail: 'The handoff records the missing samples and the blocked interpretation. It does not claim the equipment is faulty or safe.', status: 'REVIEW READY', task: 3, focus: 'pump', channel: 'flow', first: 'WITHHELD', second: 'WITHHELD' }
+      ],
+      stable: [
+        { headline: 'A quieter cycle enters the workspace.', detail: "I'm inspecting the supplied channels. This example contains a modest, smooth signal variation.", status: 'OBSERVING', task: 0, focus: 'pump', channel: 'pressure', first: 'PENDING', second: 'PENDING' },
+        { headline: 'Checking the other signals before escalating.', detail: 'Pressure and flow are available. The scripted investigation compares them with the temperature context.', status: 'CROSS-CHECKING', task: 1, focus: 'cooler', channel: 'temperature', first: 'NOT RAISED', second: 'NOT RAISED' },
+        { headline: 'No case for an interruption in this script.', detail: 'This scenario does not raise a component finding. That is not a certification that the equipment is healthy.', status: 'NO ESCALATION', task: 2, focus: 'cooler', channel: 'temperature', first: 'NOT RAISED', second: 'NOT RAISED' },
+        { headline: 'Evidence retained. No alarm added.', detail: 'The observation remains reviewable without requesting an action. The live product would need validated escalation thresholds.', status: 'OBSERVED', task: 3, focus: 'pump', channel: 'pressure', first: 'NOT RAISED', second: 'NOT RAISED' },
+        { headline: 'A quiet outcome is an outcome.', detail: 'The recording is retained for review. No safety assurance, maintenance instruction or forecast has been produced.', status: 'OBSERVED', task: 3, focus: 'pump', channel: 'pressure', first: 'NOT RAISED', second: 'NOT RAISED' }
+      ]
+    };
+    let toastTimer;
+    let challengeTimer;
+    let importTicket = 0;
+    let sceneView = null;
+    let lastFrame = performance.now();
+
+    function icons() {
+      if (window.lucide) window.lucide.createIcons();
+    }
+    function notify(message) {
+      element('toast').textContent = message;
+      element('toast').hidden = false;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { element('toast').hidden = true; }, 3800);
+    }
+    function openDialog(identifier) {
+      document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close());
+      element(identifier).showModal();
+    }
+    function syntheticRecording(caseId) {
+      return {
+        asset_id: 'FICTIONAL-HYD-01',
+        units: { time: 's', pressure: 'bar', flow: 'L/min', temperature: 'C' },
+        samples: Array.from({ length: 61 }, (_, index) => {
+          const variation = caseId === 'stable' ? 0 : index >= 21 && index <= 35 ? 12 * Math.sin((index - 20) / 16 * Math.PI) : 0;
+          return {
+            time_s: index,
+            pressure_bar: Number((170 + 4 * Math.sin(index / 5) + 0.5 * Math.sin(index * 1.6) + variation).toFixed(2)),
+            flow_l_min: caseId === 'gap' && index >= 24 && index <= 35 ? null : Number((6.4 + 0.16 * Math.sin(index / 6) - variation * 0.012).toFixed(3)),
+            temperature_c: Number((46 + index * 0.015 + 0.12 * Math.sin(index / 10)).toFixed(2))
+          };
+        })
+      };
+    }
+    function validateRecording(record) {
+      if (!record || typeof record.asset_id !== 'string' || !record.asset_id.trim() || record.asset_id.length > 120) throw new Error('asset_id must contain 1-120 characters.');
+      const units = { time: 's', pressure: 'bar', flow: 'L/min', temperature: 'C' };
+      Object.entries(units).forEach(([name, unit]) => {
+        if (record.units?.[name] !== unit) throw new Error('Expected unit ' + name + ': ' + unit + '.');
+      });
+      if (!Array.isArray(record.samples) || record.samples.length < 2 || record.samples.length > 10000) throw new Error('Provide 2-10,000 samples.');
+      let previous = -Infinity;
+      let finiteReadings = 0;
+      for (const [index, sample] of record.samples.entries()) {
+        if (!sample || typeof sample.time_s !== 'number' || !Number.isFinite(sample.time_s) || sample.time_s < 0 || sample.time_s <= previous) throw new Error('Sample ' + (index + 1) + ': timestamps must increase and be nonnegative.');
+        previous = sample.time_s;
+        for (const info of Object.values(channelInfo)) {
+          const value = sample[info.field];
+          if (value !== null && (typeof value !== 'number' || !Number.isFinite(value) || Math.abs(value) > 10000000)) throw new Error('Sample ' + (index + 1) + ': ' + info.field + ' must be a finite number or null.');
+          if (value !== null) finiteReadings++;
+        }
+      }
+      const recordingDuration = record.samples.at(-1).time_s - record.samples[0].time_s;
+      if (!finiteReadings || !Number.isFinite(recordingDuration) || recordingDuration > 86400) throw new Error('Provide readings over a duration of at most 24 hours.');
+      return record;
+    }
+    function duration() {
+      if (state.liveRecord) return state.liveRecord.duration_s;
+      if (!state.record) return 60;
+      return state.record.samples.at(-1).time_s - state.record.samples[0].time_s;
+    }
+    function statistics(channel) {
+      const info = channelInfo[channel];
+      const values = state.record.samples.map(sample => sample[info.field]).filter(value => value !== null);
+      return {
+        channel, unit: info.unit, count: values.length,
+        missing: state.record.samples.length - values.length,
+        min: values.length ? Math.min(...values) : null,
+        max: values.length ? Math.max(...values) : null,
+        mean: values.length ? values.reduce((total, value) => total + value, 0) / values.length : null
+      };
+    }
+    function currentStory() {
+      if (LIVE_APP_MODE) return window.faultscopeLive?.story() || { headline: 'Loading public recordings.', detail: 'Connecting to the local evidence service.', status: 'LOADING', task: -1, first: 'PENDING', second: 'NOT RUN' };
+      if (state.imported) return { headline: 'Your recording. No invented diagnosis.', detail: 'The signal data is loaded and validated locally. No live AI is connected, so this file will not receive a scripted component finding.', status: 'DATA LOADED', task: -1, first: 'NOT RUN', second: 'NOT RUN' };
+      if (state.challenging) return { headline: 'Testing the first explanation.', detail: 'The scripted challenge reopens the competing explanation and checks which evidence is missing. The measurements themselves have not changed.', status: 'CHALLENGING', task: 2, first: 'CONTESTED', second: 'REOPENED' };
+      if (state.challenged) return { headline: 'That conclusion needs more evidence.', detail: 'The challenge leaves the component attribution unresolved. Preserve the alternatives and missing readings in the engineer handoff.', status: 'QUALIFIED', task: 3, first: 'UNRESOLVED', second: 'UNRESOLVED' };
+      return stories[state.caseId][Math.max(0, state.stage)];
+    }
+    function selectChannel(channel) {
+      state.channel = channel;
+      if (state.liveRecord && window.faultscopeLive) {
+        window.faultscopeLive.selectSensor({ pressure: 'PS1', flow: 'FS1', temperature: 'TS1' }[channel]);
+        return;
+      }
+      if (state.liveRecord) state.liveSensor = { pressure: 'PS1', flow: 'FS1', temperature: 'TS1' }[channel];
+      if (state.liveRecord && element('native-channel')) element('native-channel').value = state.liveSensor;
+      document.querySelectorAll('[data-channel]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.channel === channel)));
+      drawSignal();
+    }
+    function selectComponent(component, manual = false) {
+      state.focus = component;
+      if (manual) state.manualFocusUntil = performance.now() + 8000;
+      document.querySelectorAll('[data-component]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.component === component)));
+      element('focus-title').textContent = componentInfo[component].title;
+      element('focus-subtitle').textContent = componentInfo[component].subtitle;
+      if (LIVE_APP_MODE) {
+        element('focus-subtitle').textContent = state.liveRecord?.profile === 'bearing' ? componentInfo[component].subtitle : 'REFERENCE GEOMETRY / SENSOR PLACEMENT NOT VERIFIED';
+        if (state.liveRecord?.profile === 'bearing' && ['bearing', 'encoder'].includes(component)) window.faultscopeLive?.selectSensor(component === 'encoder' ? 'ENC_RAW' : 'VIB_RAW');
+      } else if (manual) selectChannel(componentInfo[component].channel);
+    }
+    function paintStory() {
+      if (LIVE_APP_MODE) { window.faultscopeLive?.render(); return; }
+      const story = currentStory();
+      element('agent-headline').textContent = story.headline;
+      element('agent-description').textContent = story.detail;
+      element('agent-state').textContent = story.status;
+      element('event-number').textContent = state.imported ? 'LOCAL FILE' : state.challenged || state.challenging ? 'CHALLENGE' : String(state.stage + 1).padStart(2, '0') + ' / 05';
+      const headline = element('agent-headline');
+      headline.classList.remove('animate-in');
+      void headline.offsetWidth;
+      headline.classList.add('animate-in');
+      document.querySelectorAll('[data-task]').forEach(item => {
+        const taskIndex = Number(item.dataset.task);
+        item.classList.toggle('active', story.task === taskIndex);
+        item.classList.toggle('done', story.task > taskIndex);
+        item.querySelector('.task-state').textContent = state.imported ? 'NOT RUN' : story.task > taskIndex ? 'DONE' : story.task === taskIndex ? 'ACTIVE' : 'QUEUED';
+      });
+      element('analysis-progress').style.width = state.imported ? '0%' : state.challenged ? '100%' : (Math.max(0, state.stage) + 1) * 20 + '%';
+      element('result-one').textContent = story.first;
+      element('result-two').textContent = story.second;
+      element('result-one').classList.toggle('caution', !['PENDING','NOT RUN','NOT RAISED'].includes(story.first));
+      element('result-two').classList.toggle('caution', !['PENDING','NOT RUN','NOT RAISED'].includes(story.second));
+      element('challenge').disabled = state.imported || state.challenging || (!state.challenged && state.stage < 2);
+      element('challenge').querySelector('span').textContent = state.challenging ? 'Checking contrary evidence...' : state.challenged ? 'Open qualified brief' : 'Challenge finding';
+      document.querySelectorAll('.component-marker').forEach(button => button.classList.toggle('attention', !state.imported && state.caseId !== 'stable' && state.stage > 0 && ['valve','accumulator'].includes(button.dataset.component)));
+      if (!state.imported && !state.challenged && !state.challenging && performance.now() > state.manualFocusUntil) {
+        if (story.focus) selectComponent(story.focus);
+        if (story.channel) selectChannel(story.channel);
+      }
+    }
+    function updateStage() {
+      if (LIVE_APP_MODE || state.imported || state.challenged || state.challenging) return;
+      const nextStage = [0, 7, 16, 27, 40].reduce((latest, threshold, index) => state.seconds >= threshold ? index : latest, 0);
+      if (nextStage !== state.stage) {
+        state.stage = nextStage;
+        paintStory();
+      }
+    }
+    function setPlaying(playing) {
+      state.playing = playing;
+      element('play').innerHTML = '<i data-lucide="' + (playing ? 'pause' : 'play') + '"></i>';
+      element('play').title = playing ? 'Pause replay' : 'Play replay';
+      element('play').setAttribute('aria-label', element('play').title);
+      element('run-status').textContent = LIVE_APP_MODE ? (playing ? 'RECORDED PLAYBACK' : state.seconds >= duration() ? 'REPLAY COMPLETE' : 'REPLAY PAUSED') : playing ? 'REPLAY RUNNING' : state.seconds >= duration() ? 'REPLAY COMPLETE' : 'REPLAY PAUSED';
+      icons();
+    }
+    function resetInvestigation() {
+      if (LIVE_APP_MODE) { state.seconds = 0; setPlaying(Boolean(state.liveRecord)); drawSignal(); return; }
+      clearTimeout(challengeTimer);
+      state.generation++;
+      state.seconds = 0;
+      state.stage = -1;
+      state.challenged = false;
+      state.challenging = false;
+      state.manualFocusUntil = 0;
+      element('review-note').value = '';
+      element('reviewed').checked = false;
+      element('export-status').textContent = '';
+      if (state.imported) paintStory();
+      else updateStage();
+      setPlaying(true);
+      drawSignal();
+    }
+    function loadRecord(record, fileName, imported, caseId = 'mixed') {
+      if (LIVE_APP_MODE) throw new Error('Synthetic and custom preview recordings belong to the separate demo route.');
+      validateRecording(record);
+      state.record = record;
+      state.fileName = fileName;
+      state.imported = imported;
+      state.caseId = caseId;
+      element('source-name').textContent = fileName;
+      const missing = Object.keys(channelInfo).reduce((sum, channel) => sum + statistics(channel).missing, 0);
+      element('source-meta').textContent = (imported ? 'Local import' : 'Synthetic recording') + ' / ' + record.samples.length + ' samples / ' + (missing ? missing + ' missing readings' : duration().toFixed(0) + ' seconds');
+      element('scrubber').max = duration();
+      element('mode-footer').textContent = imported ? 'LOCAL RECORDING / NO AI ANALYSIS / NO EQUIPMENT CONNECTION' : 'SYNTHETIC SIGNALS / SCRIPTED AI / READ-ONLY CONCEPT';
+      selectChannel('pressure');
+      resetInvestigation();
+    }
+    function formatTime(seconds) {
+      const wholeSeconds = Math.floor(seconds);
+      return String(Math.floor(wholeSeconds / 60)).padStart(2, '0') + ':' + String(wholeSeconds % 60).padStart(2, '0');
+    }
+    function drawSignal() {
+      if (LIVE_APP_MODE) window.faultscopeLive?.updateReplayReadings?.();
+      if (LIVE_APP_MODE && window.faultscopeLive?.drawSpectrum?.()) return;
+      const canvas = element('signal-canvas');
+      if ((!state.record && !state.liveRecord) || !canvas.clientWidth) return;
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      const pixelRatio = Math.min(devicePixelRatio || 1, 2);
+      if (canvas.width !== Math.round(width * pixelRatio) || canvas.height !== Math.round(height * pixelRatio)) {
+        canvas.width = Math.round(width * pixelRatio);
+        canvas.height = Math.round(height * pixelRatio);
+      }
+      const context = canvas.getContext('2d');
+      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      context.clearRect(0, 0, width, height);
+      const native = state.liveRecord?.channels.find(channel => channel.id === state.liveSensor);
+      const info = native ? { unit: native.unit, label: native.quantity, color: '#d3f891' } : channelInfo[state.channel];
+      const summary = native ? { ...native.statistics, count: native.sample_count, missing: 0 } : statistics(state.channel);
+      const points = native ? native.points : state.record.samples.map(sample => [sample.time_s - state.record.samples[0].time_s, sample[info.field]]);
+      context.strokeStyle = '#394c3f';
+      context.lineWidth = 0.7;
+      for (let line = 1; line <= 3; line++) {
+        context.beginPath(); context.moveTo(0, line * height / 4); context.lineTo(width, line * height / 4); context.stroke();
+      }
+      if (state.liveRecord && state.evidenceWindow?.channel === state.liveSensor) {
+        context.fillStyle = '#a4d46916';
+        context.fillRect(width * state.evidenceWindow.start / duration(), 0, width * (state.evidenceWindow.end - state.evidenceWindow.start) / duration(), height);
+      } else if (!LIVE_APP_MODE && !state.imported && state.caseId !== 'stable') {
+        context.fillStyle = state.caseId === 'gap' ? '#a4653c22' : '#a4d46916';
+        context.fillRect(width * 21 / 60, 0, width * 14 / 60, height);
+      }
+      if (summary.count) {
+        const scale = Math.max(summary.max - summary.min, Math.abs(summary.mean) * 0.004, 0.01);
+        const lower = summary.min - scale * 0.18;
+        const spread = scale * 1.36;
+        context.beginPath();
+        context.lineWidth = 1.7;
+        context.strokeStyle = info.color;
+        let newSegment = true;
+        for (const [sampleTime, sampleValue] of points) {
+          if (sampleValue === null) { newSegment = true; continue; }
+          const horizontal = sampleTime / duration() * width;
+          const vertical = height - (sampleValue - lower) / spread * height;
+          if (newSegment) context.moveTo(horizontal, vertical);
+          else context.lineTo(horizontal, vertical);
+          newSegment = false;
+        }
+        context.stroke();
+      }
+      const horizontal = state.seconds / duration() * width;
+      context.strokeStyle = '#dcebd7';
+      context.lineWidth = 0.8;
+      context.beginPath(); context.moveTo(horizontal, 0); context.lineTo(horizontal, height); context.stroke();
+      const sample = points.reduce((nearest, candidate) => Math.abs(candidate[0] - state.seconds) < Math.abs(nearest[0] - state.seconds) ? candidate : nearest, points[0]);
+      const value = sample[1];
+      element('chart-reading').replaceChildren(document.createTextNode(value === null ? 'Missing ' : (native?.unit === 'recorded units' ? value.toPrecision(4) : value.toFixed(state.channel === 'flow' ? 2 : 1)) + ' '));
+      const unit = document.createElement('span'); unit.textContent = info.unit; element('chart-reading').append(unit);
+      element('chart-summary').textContent = info.label + ': displayed native sample at ' + sample[0] + ' seconds = ' + (value === null ? 'missing' : value + ' ' + info.unit) + '. ' + summary.missing + ' missing readings.';
+      element('chart-range').textContent = native ? native.id + ' / ' + native.rate_hz + ' Hz / MIN-MAX PREVIEW' : (state.imported ? 'LOCAL' : 'SYNTHETIC') + ' / ' + info.label.toUpperCase();
+      element('chart-window').textContent = summary.missing ? summary.missing + ' MISSING READINGS' : '0 - ' + duration().toFixed(0) + ' SECONDS';
+      element('play-time').textContent = formatTime(state.seconds);
+      element('scrubber').value = state.seconds;
+    }
+
+    function createMachineScene() {
+      if (!window.THREE) throw new Error('Three.js asset unavailable');
+      const THREE = window.THREE;
+      const container = element('machine-canvas');
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.35;
+      container.append(renderer.domElement);
+      const scene = new THREE.Scene();
+      const camera = new THREE.OrthographicCamera(-5, 5, 4, -4, 0.1, 100);
+      scene.add(new THREE.HemisphereLight(0xe8fff0, 0x535858, 3.2));
+      const key = new THREE.DirectionalLight(0xfff5df, 4.4);
+      key.position.set(-3, 7, 5); key.castShadow = true; key.shadow.mapSize.set(1024, 1024);
+      key.shadow.camera.left = -7; key.shadow.camera.right = 7; key.shadow.camera.top = 7; key.shadow.camera.bottom = -7;
+      key.shadow.normalBias = 0.05; scene.add(key);
+      const rim = new THREE.DirectionalLight(0x92d8d0, 3.5); rim.position.set(4, 3, -5); scene.add(rim);
+      const assembly = new THREE.Group(); scene.add(assembly);
+      const metal = new THREE.MeshStandardMaterial({ color: 0x9daaa8, metalness: 0.7, roughness: 0.32 });
+      const darkMetal = new THREE.MeshStandardMaterial({ color: 0x334b45, metalness: 0.55, roughness: 0.4 });
+      const trim = new THREE.MeshStandardMaterial({ color: 0x26342f, metalness: 0.5, roughness: 0.42 });
+      const lime = new THREE.MeshStandardMaterial({ color: 0xc9e69e, metalness: 0.18, roughness: 0.35 });
+      const copper = new THREE.MeshStandardMaterial({ color: 0xb8816a, metalness: 0.65, roughness: 0.35 });
+      const groups = {};
+      const pickable = [];
+      function addMesh(parent, geometry, material, position, rotation) {
+        const mesh = new THREE.Mesh(geometry, material);
+        if (position) mesh.position.set(...position);
+        if (rotation) mesh.rotation.set(...rotation);
+        mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh);
+        return mesh;
+      }
+      function box(parent, dimensions, position, material = metal) { return addMesh(parent, new THREE.BoxGeometry(...dimensions), material, position); }
+      function cylinder(parent, radius, height, position, material = metal, axis = 'y') {
+        return addMesh(parent, new THREE.CylinderGeometry(radius, radius, height, 32), material, position, axis === 'x' ? [0,0,Math.PI/2] : axis === 'z' ? [Math.PI/2,0,0] : null);
+      }
+      function torus(parent, radius, tube, position, material = metal, rotation = [0,0,0]) { return addMesh(parent, new THREE.TorusGeometry(radius, tube, 10, 40), material, position, rotation); }
+      function component(name, position, parent = assembly, profile = 'hydraulic') {
+        const group = new THREE.Group(); group.position.set(...position); group.userData.base = group.position.clone(); group.userData.profile = profile; parent.add(group); groups[name] = group; return group;
+      }
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(100,100), new THREE.ShadowMaterial({ color: 0x000000, opacity: 0.3 }));
+      floor.rotation.x = -Math.PI/2; floor.position.y = -0.22; floor.receiveShadow = true; scene.add(floor);
+      const grid = new THREE.GridHelper(14, 28, 0x3c5644, 0x2d3c34); grid.position.y = -0.21; grid.material.transparent = true; grid.material.opacity = 0.48; scene.add(grid);
+      box(assembly, [6.4,.13,3.25], [0,-.07,0], trim);
+      [-1.35,1.35].forEach(depth => box(assembly, [6.1,.1,.11], [0,.04,depth], metal));
+      [-2.85,2.85].forEach(horizontal => [-1.35,1.35].forEach(depth => cylinder(assembly,.08,.07,[horizontal,.13,depth],metal)));
+      const pump = component('pump', [-2,0.5,.15]);
+      box(pump,[1.32,.15,.8],[0,-.34,0],darkMetal);
+      cylinder(pump,.37,1.12,[0,.10,0],darkMetal,'x');
+      for(let fin=0;fin<10;fin++) cylinder(pump,.405,.035,[-.46+fin*.10,.10,0],metal,'x');
+      cylinder(pump,.43,.12,[-.61,.10,0],metal,'x');
+      cylinder(pump,.39,.17,[.65,.10,0],metal,'x');
+      cylinder(pump,.22,.24,[.84,.10,0],trim,'x');
+      box(pump,[.45,.21,.44],[-.15,.54,0],darkMetal);
+      box(pump,[.22,.03,.28],[-.15,.67,0],lime);
+      for(let bolt=0;bolt<6;bolt++) {
+        const angle=bolt/6*Math.PI*2;
+        cylinder(pump,.037,.07,[.76,.10+Math.cos(angle)*.29,Math.sin(angle)*.29],trim,'x');
+      }
+      const valve=component('valve',[0,.62,-.50]);
+      box(valve,[1.12,.53,.69],[0,0,0],metal);
+      box(valve,[1.3,.10,.85],[0,-.33,0],trim);
+      cylinder(valve,.23,.49,[-.65,.02,0],darkMetal,'x');
+      cylinder(valve,.23,.49,[.65,.02,0],darkMetal,'x');
+      cylinder(valve,.24,.07,[-.91,.02,0],copper,'x');
+      cylinder(valve,.24,.07,[.91,.02,0],copper,'x');
+      cylinder(valve,.16,.22,[-.26,.36,0],trim);
+      cylinder(valve,.16,.22,[.26,.36,0],trim);
+      box(valve,[.32,.025,.26],[0,.28,.1],lime);
+      [-.4,.4].forEach(horizontal=>[-.22,.22].forEach(depth=>cylinder(valve,.035,.04,[horizontal,.285,depth],trim)));
+      const accumulator=component('accumulator',[2.15,1.05,-.58]);
+      cylinder(accumulator,.38,1.35,[0,.12,0],darkMetal);
+      addMesh(accumulator,new THREE.SphereGeometry(.38,32,20),darkMetal,[0,.80,0]);
+      addMesh(accumulator,new THREE.SphereGeometry(.38,32,20),darkMetal,[0,-.56,0]);
+      cylinder(accumulator,.12,.22,[0,1.18,0],metal);
+      cylinder(accumulator,.12,.20,[0,-.93,0],metal);
+      torus(accumulator,.39,.035,[0,.36,0],metal,[Math.PI/2,0,0]);
+      torus(accumulator,.39,.035,[0,-.30,0],metal,[Math.PI/2,0,0]);
+      box(accumulator,[.06,.12,.2],[.40,.35,0],metal);
+      const cooler=component('cooler',[1.02,.68,1]);
+      box(cooler,[1.28,1.06,.37],[0,0,0],trim);
+      for(let fin=0;fin<14;fin++) box(cooler,[.042,.94,.42],[-.56+fin*.086,0,0],metal);
+      torus(cooler,.37,.048,[0,0,.24],darkMetal);
+      cylinder(cooler,.12,.08,[0,0,.28],darkMetal,'z');
+      const fan=new THREE.Group();fan.position.set(0,0,.26);cooler.add(fan);
+      for(let blade=0;blade<6;blade++) {
+        const spoke=box(fan,[.12,.48,.033],[0,0,0],darkMetal);
+        spoke.rotation.z=blade*Math.PI/3;spoke.position.set(Math.sin(-blade*Math.PI/3)*.17,Math.cos(blade*Math.PI/3)*.17,0);
+      }
+      [-.53,.53].forEach(horizontal=>box(cooler,[.13,.20,.49],[horizontal,-.61,0],metal));
+      box(assembly,[1.7,.60,1.02],[-.92,.34,1],darkMetal);
+      box(assembly,[1.77,.06,1.08],[-.92,.67,1],metal);
+      cylinder(assembly,.11,.15,[-1.37,.77,.86],copper);
+      box(assembly,[.50,.23,.025],[-.88,.40,1.52],trim);
+      box(assembly,[.24,.10,.03],[-.88,.43,1.54],lime);
+      const pipes=[];
+      function pipe(points) {
+        const curve=new THREE.CatmullRomCurve3(points.map(point=>new THREE.Vector3(...point)),false,'catmullrom',.08);
+        const mesh=addMesh(assembly,new THREE.TubeGeometry(curve,60,.047,9,false),metal);
+        pipes.push({curve,mesh});
+        points.filter((_,index)=>index===0||index===points.length-1).forEach(position=>cylinder(assembly,.080,.14,position,copper));
+      }
+      pipe([[-1.15,.60,.15],[-.9,.60,.15],[-.80,.79,-.45],[-.34,.98,-.5]]);
+      pipe([[.31,.99,-.5],[.40,1.25,-.60],[1.57,1.25,-.60],[1.70,.34,-.60],[2.15,.15,-.58]]);
+      pipe([[2.15,.15,-.58],[2.55,.23,-.58],[2.55,.23,1.06],[1.65,.42,1.06]]);
+      pipe([[.35,.46,1],[-.05,.42,1],[-.10,.72,1],[-.70,.72,1]]);
+      pipe([[-1.70,.41,1],[-2.63,.32,1],[-2.70,.50,.20],[-2.62,.62,.15]]);
+      const fluidMaterial=new THREE.MeshBasicMaterial({color:0xd3f891});
+      const fluid=[];
+      pipes.forEach((entry,pathIndex)=>{for(let marker=0;marker<4;marker++) {
+        const particle=new THREE.Mesh(new THREE.SphereGeometry(.044,7,5),fluidMaterial);assembly.add(particle);fluid.push({particle,curve:entry.curve,offset:marker/4+pathIndex*.03});
+      }});
+      const bearingAssembly = new THREE.Group(); scene.add(bearingAssembly);
+      const blueMetal = new THREE.MeshStandardMaterial({color:0x418d99,metalness:.58,roughness:.35});
+      const sensorMaterial = new THREE.MeshStandardMaterial({color:0xeab382,metalness:.35,roughness:.33});
+      box(bearingAssembly,[6.4,.17,2.0],[0,-.045,0],trim);
+      [-.77,.77].forEach(depth=>box(bearingAssembly,[6.05,.07,.10],[0,.07,depth],metal));
+      for(let horizontal=-2.8;horizontal<=2.8;horizontal+=.7){[-.77,.77].forEach(depth=>cylinder(bearingAssembly,.055,.08,[horizontal,.13,depth],metal));}
+      const drive=component('drive',[-2.15,.75,0],bearingAssembly,'bearing');
+      box(drive,[1.42,.13,.91],[0,-.51,0],metal);
+      cylinder(drive,.43,1.25,[0,0,0],blueMetal,'x');
+      for(let fin=0;fin<12;fin++)cylinder(drive,.46,.033,[-.55+fin*.10,0,0],metal,'x');
+      cylinder(drive,.48,.1,[-.69,0,0],trim,'x');
+      cylinder(drive,.33,.16,[.69,0,0],blueMetal,'x');
+      box(drive,[.45,.19,.44],[-.18,.5,0],blueMetal);
+      box(drive,[.27,.02,.22],[-.18,.61,0],lime);
+      const shaftRotor = new THREE.Group(); bearingAssembly.add(shaftRotor); shaftRotor.position.y=.75;
+      cylinder(shaftRotor,.12,4.15,[.49,0,0],metal,'x');
+      [-1.32,-1.09].forEach(horizontal=>{cylinder(shaftRotor,.27,.17,[horizontal,0,0],copper,'x');
+        for(let bolt=0;bolt<6;bolt++){const angle=bolt*Math.PI/3;cylinder(shaftRotor,.029,.2,[horizontal,Math.sin(angle)*.2,Math.cos(angle)*.2],trim,'x');}});
+      cylinder(shaftRotor,.20,.15,[-1.21,0,0],trim,'x');
+      function bearingHousing(name, position, color){
+        const group=component(name,position,bearingAssembly,'bearing');
+        box(group,[.74,.13,1.18],[0,-.56,0],metal);
+        [-.45,.45].forEach(depth=>{box(group,[.34,.42,.19],[0,-.33,depth],color);cylinder(group,.055,.08,[.22,-.45,depth],trim);});
+        torus(group,.48,.095,[0,0,0],color,[0,Math.PI/2,0]);
+        torus(group,.38,.058,[.07,0,0],metal,[0,Math.PI/2,0]);
+        torus(group,.20,.062,[.11,0,0],metal,[0,Math.PI/2,0]);
+        for(let ball=0;ball<10;ball++){const angle=ball*Math.PI/5;addMesh(group,new THREE.SphereGeometry(.071,14,10),metal,[.13,Math.cos(angle)*.29,Math.sin(angle)*.29]);}
+        [-.36,.36].forEach(height=>[-.36,.36].forEach(depth=>cylinder(group,.038,.09,[.14,height,depth],trim,'x')));
+        return group;
+      }
+      bearingHousing('support',[-.5,.75,0],blueMetal);
+      const testBearing=bearingHousing('bearing',[1.32,.75,0],darkMetal);
+      cylinder(testBearing,.10,.22,[0,.60,0],sensorMaterial);
+      box(testBearing,[.14,.13,.15],[0,.76,0],trim);
+      const sensorLead=new THREE.CatmullRomCurve3([[0,.8,0],[.2,1,-.1],[.7,.8,-.7],[.85,-.4,-.8]].map(point=>new THREE.Vector3(...point)));
+      addMesh(testBearing,new THREE.TubeGeometry(sensorLead,32,.025,6,false),trim);
+      const encoder=component('encoder',[2.50,.75,0],bearingAssembly,'bearing');
+      box(encoder,[.28,.48,.57],[.07,0,0],blueMetal);
+      cylinder(encoder,.33,.09,[-.15,0,0],metal,'x');
+      torus(encoder,.29,.021,[-.22,0,0],trim,[0,Math.PI/2,0]);
+      box(encoder,[.25,.48,.17],[.12,-.43,0],metal);
+      box(encoder,[.6,.08,.8],[.02,-.63,0],metal);
+      box(encoder,[.13,.12,.19],[.13,.33,0],sensorMaterial);
+      Object.entries(groups).forEach(([name,group])=>group.traverse(object=>{
+        if(object.isMesh){object.userData.component=name;object.userData.profile=group.userData.profile;object.material=object.material.clone();pickable.push(object);}
+      }));
+      const offsets={pump:new THREE.Vector3(-.36,.17,.15),valve:new THREE.Vector3(0,.42,-.25),accumulator:new THREE.Vector3(.36,.30,-.15),cooler:new THREE.Vector3(.20,.17,.36),drive:new THREE.Vector3(-.35,.25,0),support:new THREE.Vector3(0,.65,-.35),bearing:new THREE.Vector3(.3,.70,.4),encoder:new THREE.Vector3(.35,.35,0)};
+      const anchors={pump:new THREE.Vector3(-.18,1.02,.08),valve:new THREE.Vector3(0,.75,-.12),accumulator:new THREE.Vector3(0,1.38,0),cooler:new THREE.Vector3(0,-.35,.45),drive:new THREE.Vector3(-.35,.8,0),support:new THREE.Vector3(-.1,-.5,.6),bearing:new THREE.Vector3(0,1.15,0),encoder:new THREE.Vector3(.2,-.45,.6)};
+      const raycaster=new THREE.Raycaster();
+      const pointer=new THREE.Vector2();
+      let pointerStart=null;
+      let moved=false;
+      container.addEventListener('pointerdown',event=>{if(event.pointerType==='touch')return;pointerStart={horizontal:event.clientX,vertical:event.clientY,yaw:state.targetYaw,pitch:state.targetPitch};moved=false;container.setPointerCapture(event.pointerId);});
+      container.addEventListener('pointermove',event=>{if(!pointerStart)return;const delta=event.clientX-pointerStart.horizontal;const vertical=event.clientY-pointerStart.vertical;if(Math.abs(delta)+Math.abs(vertical)>5)moved=true;state.targetYaw=pointerStart.yaw-delta*.007;state.targetPitch=Math.max(.32,Math.min(1.05,pointerStart.pitch+vertical*.004));});
+      function release(event){
+        if(!moved){const bounds=container.getBoundingClientRect();pointer.set((event.clientX-bounds.left)/bounds.width*2-1,-(event.clientY-bounds.top)/bounds.height*2+1);raycaster.setFromCamera(pointer,camera);const profile=state.liveRecord?.profile||'hydraulic';const hit=raycaster.intersectObjects(pickable.filter(mesh=>mesh.userData.profile===profile))[0];if(hit)selectComponent(hit.object.userData.component,true);}
+        pointerStart=null;moved=false;
+      }
+      container.addEventListener('pointerup',release);
+      container.addEventListener('pointercancel',()=>{pointerStart=null;moved=false;});
+      const target=new THREE.Vector3(0,.6,0);
+      function resize(){
+        const width=container.clientWidth,height=container.clientHeight;
+        if(!width||!height)return;
+        renderer.setSize(width,height);
+        const aspect=width/height;
+        const vertical=Math.max(4.8,7.6/aspect);
+        camera.left=-vertical*aspect/2;camera.right=vertical*aspect/2;camera.top=vertical/2;camera.bottom=-vertical/2;camera.updateProjectionMatrix();
+        render(performance.now(),0);
+      }
+      new ResizeObserver(resize).observe(container);resize();
+      function render(timestamp,delta){
+        const profile=state.liveRecord?.profile||'hydraulic';
+        assembly.visible=profile==='hydraulic';bearingAssembly.visible=profile==='bearing';
+        const easing=1-Math.exp(-delta*8);
+        state.yaw+=(state.targetYaw-state.yaw)*easing;state.pitch+=(state.targetPitch-state.pitch)*easing;
+        camera.position.set(Math.sin(state.yaw)*9,Math.sin(state.pitch)*9,Math.cos(state.yaw)*9);camera.lookAt(target);
+        Object.entries(groups).forEach(([name,group])=>{
+          const desired=group.userData.base.clone();if(state.exploded)desired.add(offsets[name]);group.position.lerp(desired,easing);
+          group.traverse(object=>{if(object.isMesh){object.material.emissive.setHex(name===state.focus?0x45682c:0x000000);object.material.emissiveIntensity=name===state.focus?.34:0;}});
+        });
+        if(state.playing&&!reduceMotion&&profile==='hydraulic')state.flowPhase=(state.flowPhase+delta*state.recordedFlowRatio*.30)%1;
+        fluid.forEach(entry=>{entry.particle.visible=profile==='hydraulic'&&!state.exploded;entry.particle.position.copy(entry.curve.getPoint((state.flowPhase+entry.offset)%1));});
+        scene.updateMatrixWorld();camera.updateMatrixWorld();
+        for(const [name,group] of Object.entries(groups)){
+          const point=group.localToWorld(anchors[name].clone()).project(camera);
+          const marker=element('marker-'+name);
+          marker.hidden=group.userData.profile!==profile;
+          if(marker.hidden)continue;
+          const horizontal=Math.max(marker.offsetWidth/2+10,Math.min(container.clientWidth-marker.offsetWidth/2-10,(point.x*.5+.5)*container.clientWidth));
+          const vertical=Math.max(105,Math.min(container.clientHeight-65,(-point.y*.5+.5)*container.clientHeight));
+          marker.style.left=horizontal+'px';marker.style.top=vertical+'px';
+        }
+        renderer.render(scene,camera);
+      }
+      return {render,resize,renderer};
+    }
+
+    function updateEvidence() {
+      if (LIVE_APP_MODE) { window.faultscopeLive?.evidence(); return; }
+      element('evidence-context').textContent=state.imported?'These statistics are calculated locally from your recording. No AI analysis has run.':'Signal statistics are calculated from this synthetic recording. Agent activities and interpretations are scripted.';
+      const list=element('evidence-lines');list.replaceChildren();
+      for(const [name,info] of Object.entries(channelInfo)){
+        const summary=statistics(name);const item=document.createElement('li');const heading=document.createElement('strong');heading.textContent=info.label+' / '+info.unit;
+        const text=summary.count?summary.count+' readings; min '+summary.min.toFixed(2)+', max '+summary.max.toFixed(2)+', mean '+summary.mean.toFixed(2)+'. '+summary.missing+' missing.':'No readings available.';
+        item.append(heading,document.createTextNode(text));list.append(item);
+      }
+      const item=document.createElement('li');const heading=document.createElement('strong');heading.textContent='Source boundary';
+      item.append(heading,document.createTextNode('No direct accumulator-pressure channel, physical repair outcome, or equipment-specific safety threshold is available.'));list.append(item);
+    }
+    function reportData(){
+      if (LIVE_APP_MODE) return window.faultscopeLive.exportData();
+      const story=currentStory();return {
+        title:'FaultScope investigation brief',mode:state.imported?'Local data validation only; AI not connected':'Synthetic recording; scripted AI preview',
+        source:state.fileName,asset_id:state.record.asset_id,recording_duration_s:duration(),recording_samples:state.record.samples.length,
+        disposition:story.status,finding:story.headline,interpretation:story.detail,challenged:state.challenged,
+        evidence:Object.keys(channelInfo).map(statistics),reviewer_note:element('review-note').value,reviewed:element('reviewed').checked,
+        authorized_action:'None',limitations:'No live AI or equipment connection. Illustrated assembly is not a digital twin. No field accuracy or operational savings established.'
+      };
+    }
+    function showReport(){
+      if (LIVE_APP_MODE) { window.faultscopeLive?.report(); return; }
+      const report=reportData();element('report-status').textContent=report.disposition;element('report-title').textContent=report.finding;element('report-source').textContent=report.source;element('report-mode').textContent=report.mode;element('report-body').textContent=report.interpretation;element('export-status').textContent='';openDialog('report-dialog');
+    }
+    function download(filename,text,type){
+      const url=URL.createObjectURL(new Blob([text],{type}));const link=document.createElement('a');link.href=url;link.download=filename;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
+    }
+    async function inspectFile(file){
+      if(!file)return;const ticket=++importTicket;state.pendingImport=null;element('use-import').disabled=true;element('import-message').textContent='Reading locally...';element('import-message').classList.remove('error');
+      try{
+        if(file.size>2*1024*1024)throw new Error('File exceeds 2 MB.');
+        const text=await file.text();if(ticket!==importTicket)return;const record=validateRecording(JSON.parse(text));state.pendingImport={record,fileName:file.name};element('import-message').textContent=record.asset_id+' / '+record.samples.length+' samples validated. No AI diagnosis will be generated.';element('use-import').disabled=false;
+      }catch(error){if(ticket!==importTicket)return;element('import-message').textContent=error.message;element('import-message').classList.add('error');}
+    }
+    document.querySelectorAll('[data-close]').forEach(button=>button.addEventListener('click',()=>button.closest('dialog').close()));
+    document.querySelectorAll('dialog').forEach(dialog=>dialog.addEventListener('click',event=>{if(event.target!==dialog)return;const bounds=dialog.getBoundingClientRect();if(event.clientX<bounds.left||event.clientX>bounds.right||event.clientY<bounds.top||event.clientY>bounds.bottom)dialog.close();}));
+    element('about-open').addEventListener('click',()=>openDialog('about-dialog'));
+    element('casebook-open').addEventListener('click',()=>openDialog('casebook-dialog'));
+    element('import-open').addEventListener('click',()=>openDialog('import-dialog'));
+    element('report-open').addEventListener('click',showReport);
+    element('evidence-open').addEventListener('click',()=>{updateEvidence();openDialog('evidence-dialog');});
+    element('view-pressure').addEventListener('click',()=>{element('evidence-dialog').close();selectComponent('valve',true);selectChannel('pressure');});
+    document.querySelectorAll('[data-case]').forEach(button=>button.addEventListener('click',()=>{element('casebook-dialog').close();importTicket++;loadRecord(syntheticRecording(button.dataset.case),cases[button.dataset.case].file,false,button.dataset.case);notify(cases[button.dataset.case].name+' / scripted investigation started.');}));
+    document.querySelectorAll('[data-channel]').forEach(button=>button.addEventListener('click',()=>{state.manualFocusUntil=performance.now()+8000;selectChannel(button.dataset.channel);}));
+    document.querySelectorAll('[data-component]').forEach(button=>button.addEventListener('click',()=>selectComponent(button.dataset.component,true)));
+    element('play').addEventListener('click',()=>{if(state.seconds>=duration())resetInvestigation();else setPlaying(!state.playing);});
+    element('speed').addEventListener('change',event=>{state.rate=Number(event.target.value);});
+    element('scrubber').addEventListener('input',event=>{state.seconds=Number(event.target.value);updateStage();drawSignal();});
+    element('replay').addEventListener('click',resetInvestigation);
+    element('explode').addEventListener('click',()=>{state.exploded=!state.exploded;element('explode').setAttribute('aria-pressed',String(state.exploded));element('explode').title=state.exploded?'Assemble components':'Separate components';element('explode').setAttribute('aria-label',element('explode').title);});
+    element('rotate').addEventListener('click',()=>{state.targetYaw+=Math.PI/5;});
+    element('recenter').addEventListener('click',()=>{state.targetYaw=.55;state.targetPitch=.60;state.exploded=false;element('explode').setAttribute('aria-pressed','false');element('explode').title='Separate components';element('explode').setAttribute('aria-label','Separate components');});
+    element('challenge').addEventListener('click',()=>{
+      if (LIVE_APP_MODE) return;
+      if(state.imported||state.challenging)return;if(state.challenged){showReport();return;}
+      setPlaying(false);state.challenging=true;selectComponent('accumulator',true);selectChannel('flow');paintStory();const generation=state.generation;
+      challengeTimer=setTimeout(()=>{if(generation!==state.generation)return;state.challenging=false;state.challenged=true;paintStory();notify('Finding qualified. The contrary evidence is in the brief.');},2200);
+    });
+    element('file-input').addEventListener('change',event=>inspectFile(event.target.files[0]));
+    element('dropzone').addEventListener('dragover',event=>{event.preventDefault();element('dropzone').classList.add('dragover');});
+    element('dropzone').addEventListener('dragleave',()=>element('dropzone').classList.remove('dragover'));
+    element('dropzone').addEventListener('drop',event=>{event.preventDefault();element('dropzone').classList.remove('dragover');inspectFile(event.dataTransfer.files[0]);});
+    element('use-import').addEventListener('click',()=>{if(!state.pendingImport)return;loadRecord(state.pendingImport.record,state.pendingImport.fileName,true);element('import-dialog').close();notify('Recording opened locally. Scripted diagnosis is disabled.');});
+    element('sample-download').addEventListener('click',()=>download('faultscope-synthetic-recording.json',JSON.stringify(syntheticRecording('mixed'),null,2),'application/json'));
+    element('download-report').addEventListener('click',()=>{download('faultscope-investigation-brief.json',JSON.stringify(reportData(),null,2),'application/json');element('export-status').textContent='Download requested. No email, work order or equipment command was sent.';});
+    new ResizeObserver(drawSignal).observe(element('signal-canvas').parentElement);
+    if (!LIVE_APP_MODE) loadRecord(syntheticRecording('mixed'),cases.mixed.file,false);
+    else { state.playing = false; element('agent-headline').textContent = 'Loading public recordings.'; element('agent-description').textContent = 'Connecting to the local evidence service.'; }
+    icons();
+    try{sceneView=createMachineScene();}catch(error){element('render-fallback').hidden=false;console.warn('FaultScope 3D fallback:',error.message);}
+    function frame(timestamp){
+      const delta=Math.max(0,Math.min((timestamp-lastFrame)/1000,.10));lastFrame=timestamp;
+      if(!document.hidden){
+        if(state.playing && (state.record || state.liveRecord)){state.seconds=Math.min(duration(),state.seconds+delta*state.rate);updateStage();if(state.seconds>=duration())setPlaying(false);drawSignal();}
+        if(sceneView)sceneView.render(timestamp,delta);
+      }
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+    window.faultscopeDemo={validateRecording,syntheticRecording,statistics,reportData};
+  </script>
+  <script src="assets/live-workspace.js"></script>
+</body>
+</html>

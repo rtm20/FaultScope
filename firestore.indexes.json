@@ -1,0 +1,18 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "faultscope_runs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "owner", "order": "ASCENDING"},
+        {"fieldPath": "created", "order": "DESCENDING"}
+      ]
+    }
+  ],
+  "fieldOverrides": [
+    {"collectionGroup": "faultscope_runs", "fieldPath": "expires_at", "ttl": true, "indexes": []},
+    {"collectionGroup": "faultscope_sessions", "fieldPath": "expires_at", "ttl": true, "indexes": []},
+    {"collectionGroup": "faultscope_attempts", "fieldPath": "expires_at", "ttl": true, "indexes": []},
+    {"collectionGroup": "faultscope_runs", "fieldPath": "report", "indexes": []}
+  ]
+}
